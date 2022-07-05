@@ -1,10 +1,10 @@
 package transaction
 
 import (
-	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"log"
+	"strings"
 )
 
 func ParseTransactions(path *string) {
@@ -28,7 +28,6 @@ func ParseTransactions(path *string) {
 }
 
 func readFile(path *string, file fs.FileInfo) {
-	fmt.Println(*path, file.Name())
 	// todo: open the file and read the contents
 
 	content, err := ioutil.ReadFile(*path + "\\" + file.Name())
@@ -40,5 +39,35 @@ func readFile(path *string, file fs.FileInfo) {
 }
 
 func parseTransaction(tsx_content string) {
-	fmt.Println(tsx_content)
+	// data_items := make([]string, 4)
+
+	// split the tsx_content on white spaces
+	splited := strings.Split(tsx_content, " ")
+
+	// write a simple dfa to parse each of the data items
+	parseOperation := func(operation string) (string, string) {
+		// split operation to bytes, it should contain only 4 bytes
+		bytes := strings.Split(operation, "")
+		if len(bytes) != 4 {
+			log.Fatalf("operation %s is not a valid operation", operation)
+		}
+		op := bytes[0]
+		data_item := bytes[2]
+		return op, data_item
+	}
+
+	operations := []Operation{}
+
+	for _, item := range splited {
+		operation, data_item := parseOperation(strings.ToLower(item))
+		// create the transaction Object
+		op := Operation{
+			Type:     operation,
+			DataItem: data_item,
+		}
+		operations = append(operations, op)
+	}
+
+	tsx := Transaction{}
+	tsx.new(operations)
 }

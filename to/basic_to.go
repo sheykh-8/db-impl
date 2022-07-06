@@ -81,6 +81,7 @@ func (t *TO) Run() {
 						ts.Id, it.ReadTimeStamp(), it.WriteTimeStamp(), ts.Timestamp)
 					t.schedule.ActiveTransactions = append(t.schedule.ActiveTransactions[:position],
 						t.schedule.ActiveTransactions[position+1:]...)
+					fmt.Printf("abort T %d\n", ts.Id)
 					continue
 				}
 				if i == (len(ts.Operations) - 1) {

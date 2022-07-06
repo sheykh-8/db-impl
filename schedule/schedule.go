@@ -48,7 +48,7 @@ func (s *Schedule) BeginTransaction(tsx *transaction.Transaction) {
 
 	timestampCounter++
 
-	fmt.Println("Begin", tsx.Id)
+	fmt.Println("Begin T", tsx.Id)
 }
 
 func (s *Schedule) AddEntry(tsxId int, op *transaction.Operation) {
@@ -81,7 +81,7 @@ func (s *Schedule) AbortTransaction(tsx *transaction.Transaction, lm *lock.LockM
 	// break
 	// 	}
 	// }
-	fmt.Println("Abort", tsx.Id)
+	fmt.Println("Abort T", tsx.Id)
 }
 
 func (s *Schedule) CommitTransaction(tsx *transaction.Transaction, lm *lock.LockManager) {
@@ -103,7 +103,7 @@ func (s *Schedule) CommitTransaction(tsx *transaction.Transaction, lm *lock.Lock
 
 	}
 
-	fmt.Println("commit", tsx.Id)
+	fmt.Println("commit T", tsx.Id)
 }
 
 func removeFromList(list []*transaction.Transaction, id int) []*transaction.Transaction {
@@ -180,15 +180,20 @@ func RunWithDetection() {
 					// remove the vertix from wait for graph
 					wf.RemoveVertix(ts.Id)
 
-					// re-submit the aborted transaction to the active transaction list as a new transaction
-					newTsx := transaction.Transaction{
-						Id:         ts.Id,
-						DataItems:  ts.DataItems,
-						Operations: ts.Operations,
-					}
+					go func() {
+						time.Sleep(100 * time.Millisecond)
+						// re-submit the aborted transaction to the active transaction list as a new transaction
+						newTsx := transaction.Transaction{
+							Id:         ts.Id,
+							DataItems:  ts.DataItems,
+							Operations: ts.Operations,
+						}
 
-					schedule.BeginTransaction(&newTsx)
-					wf.AddVertex(newTsx.Id)
+						schedule.BeginTransaction(&newTsx)
+						wf.AddVertex(newTsx.Id)
+
+					}()
+
 				}
 
 			}

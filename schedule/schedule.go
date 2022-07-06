@@ -3,6 +3,7 @@ package schedule
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"sherfan.org/dbimpl/lock"
@@ -60,12 +61,12 @@ func (s *Schedule) AbortTransaction(tsx *transaction.Transaction, lm *lock.LockM
 	s.Items = append(s.Items, ScheduleItem{TsxId: tsx.Id, Status: Abort, Op: nil})
 	// release all the locks that were acquired by the transaction
 	for _, dataItem := range tsx.DataItems {
-		if ok := lm.RemoveFromWaitList(tsx, dataItem); ok {
-			fmt.Println("remove ", tsx.Id, "from wait list", dataItem)
-		}
+		// if ok := lm.RemoveFromWaitList(tsx, dataItem); ok {
+		// 	fmt.Println("remove ", tsx.Id, "from wait list", dataItem)
+		// }
 		// check the waitlist for the lock and start a transaction from the start of th waitlist
 		if tsx, ok := lm.PickWaitList(dataItem); ok {
-			fmt.Println("start transaction", tsx.Id)
+			fmt.Println("Resume T", tsx.Id)
 			s.ActiveTransactions = append(s.ActiveTransactions, tsx)
 		}
 		// release the lock
@@ -117,6 +118,8 @@ func removeFromList(list []*transaction.Transaction, id int) []*transaction.Tran
 }
 
 func RunWithDetection() {
+	var wg sync.WaitGroup
+
 	schedule := Schedule{}
 	schedule.Init()
 
@@ -142,6 +145,88 @@ func RunWithDetection() {
 		wf.AddVertex(tsx.Id)
 	}
 
+	// performTransactions := func() {
+	// 	index := 0
+	// 	for len(schedule.ActiveTransactions) > 0 {
+	// 		// get the next operation to execute
+	// 		ts := schedule.ActiveTransactions[index]
+
+	// 		peekOp := ts.PeekNextOperation()
+	// 		if peekOp == nil {
+	// 			// transaction is finished
+	// 			schedule.CommitTransaction(ts, &lm)
+	// 			// remove vertice from the wait for graph
+	// 			wf.RemoveVertix(ts.Id)
+
+	// 		} else {
+	// 			if _, ok := lm.AquireLock(ts.Id, ts.PeekNextOperation().DataItem, ts.PeekNextOperation().Type); ok {
+	// 				op := ts.ExecuteNextOperation()
+	// 				// add the operation to the schedule
+	// 				schedule.AddEntry(ts.Id, op)
+	// 			} else {
+	// 				// couldn't get the lock
+	// 				// fmt.Println("couldn't get the lock")
+	// 				// remove the transaction from the active list
+	// 				schedule.ActiveTransactions = removeFromList(schedule.ActiveTransactions, ts.Id)
+
+	// 				// add an edge to the wait list graph
+	// 				list, _ := lm.AquireLock(ts.Id, peekOp.DataItem, peekOp.Type)
+	// 				for _, e := range list {
+	// 					wf.AddEdge(ts.Id, e)
+	// 				}
+	// 				// check if there is a deadlock in the wait list using wait for graph
+	// 				if wf.IsDeadlock() {
+	// 					fmt.Println("deadlock check", true)
+	// 					// abort the current transaction that is causing the deadlock
+	// 					schedule.AbortTransaction(ts, &lm)
+
+	// 					// remove the vertix from wait for graph
+	// 					wf.RemoveVertix(ts.Id)
+
+	// 					wg.Add(1)
+
+	// 					resubmit := func() {
+	// 						defer wg.Done()
+	// 						time.Sleep(1000 * time.Millisecond)
+	// 						// re-submit the aborted transaction to the active transaction list as a new transaction
+	// 						newTsx := transaction.Transaction{
+	// 							Id:         ts.Id,
+	// 							DataItems:  ts.DataItems,
+	// 							Operations: ts.Operations,
+	// 						}
+
+	// 						schedule.BeginTransaction(&newTsx)
+	// 						fmt.Println("resubmited transaction", newTsx.Id)
+	// 						wf.AddVertex(newTsx.Id)
+
+	// 					}
+
+	// 					go resubmit()
+
+	// 				} else {
+	// 					// add the transaction to wait list
+	// 					lm.AddToWaitList(ts, peekOp.DataItem)
+	// 					fmt.Println("Wait T", ts.Id, "for", peekOp.DataItem)
+	// 				}
+
+	// 			}
+
+	// 		}
+
+	// 		if len(schedule.ActiveTransactions) == 0 {
+	// 			break
+	// 		} else {
+	// 			index = (index + 1) % (len(schedule.ActiveTransactions))
+	// 		}
+	// 	}
+	// }
+
+	performTranasctions(&schedule, &lm, wf, &wg)
+
+	wg.Wait()
+}
+
+func performTranasctions(schedule *Schedule, lm *lock.LockManager, wf *lock.WaitForGraph, wg *sync.WaitGroup) {
 	index := 0
 	for len(schedule.ActiveTransactions) > 0 {
 		// get the next operation to execute
@@ -150,7 +235,7 @@ func RunWithDetection() {
 		peekOp := ts.PeekNextOperation()
 		if peekOp == nil {
 			// transaction is finished
-			schedule.CommitTransaction(ts, &lm)
+			schedule.CommitTransaction(ts, lm)
 			// remove vertice from the wait for graph
 			wf.RemoveVertix(ts.Id)
 
@@ -164,8 +249,7 @@ func RunWithDetection() {
 				// fmt.Println("couldn't get the lock")
 				// remove the transaction from the active list
 				schedule.ActiveTransactions = removeFromList(schedule.ActiveTransactions, ts.Id)
-				// add the transaction to wait list
-				lm.AddToWaitList(ts, peekOp.DataItem)
+
 				// add an edge to the wait list graph
 				list, _ := lm.AquireLock(ts.Id, peekOp.DataItem, peekOp.Type)
 				for _, e := range list {
@@ -175,12 +259,15 @@ func RunWithDetection() {
 				if wf.IsDeadlock() {
 					fmt.Println("deadlock check", true)
 					// abort the current transaction that is causing the deadlock
-					schedule.AbortTransaction(ts, &lm)
+					schedule.AbortTransaction(ts, lm)
 
 					// remove the vertix from wait for graph
 					wf.RemoveVertix(ts.Id)
 
-					go func() {
+					wg.Add(1)
+
+					resubmit := func() {
+						defer wg.Done()
 						time.Sleep(100 * time.Millisecond)
 						// re-submit the aborted transaction to the active transaction list as a new transaction
 						newTsx := transaction.Transaction{
@@ -190,13 +277,22 @@ func RunWithDetection() {
 						}
 
 						schedule.BeginTransaction(&newTsx)
+						fmt.Println("resubmited transaction", newTsx.Id)
 						wf.AddVertex(newTsx.Id)
 
-					}()
+						performTranasctions(schedule, lm, wf, wg)
+					}
 
+					go resubmit()
+
+				} else {
+					// add the transaction to wait list
+					lm.AddToWaitList(ts, peekOp.DataItem)
+					fmt.Println("Wait T", ts.Id, "for", peekOp.DataItem)
 				}
 
 			}
+
 		}
 
 		if len(schedule.ActiveTransactions) == 0 {
@@ -205,7 +301,6 @@ func RunWithDetection() {
 			index = (index + 1) % (len(schedule.ActiveTransactions))
 		}
 	}
-
 }
 
 func RunWithPrevention() {

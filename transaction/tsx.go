@@ -22,9 +22,10 @@ type Transaction struct {
 
 var Transactions []Transaction
 
-func (t *Transaction) NewTransaction(ops []Operation) {
+func (t *Transaction) NewTransaction(ops []Operation, dataItems []string) {
 	t.Id = len(Transactions)
 	t.Operations = ops
+	t.DataItems = dataItems
 	Transactions = append(Transactions, *t)
 	// fmt.Println(t)
 }
@@ -44,4 +45,11 @@ func (t *Transaction) ExecuteNextOperation() *Operation {
 	op := t.Operations[t.executedOperations]
 	t.executedOperations += 1
 	return &op
+}
+
+func (t *Transaction) PeekNextOperation() *Operation {
+	if t.executedOperations > len(t.Operations)-1 {
+		return nil
+	}
+	return &t.Operations[t.executedOperations]
 }

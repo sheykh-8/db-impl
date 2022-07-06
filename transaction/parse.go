@@ -39,7 +39,7 @@ func readFile(path *string, file fs.FileInfo) {
 }
 
 func parseTransaction(tsx_content string) {
-	// data_items := make([]string, 4)
+	data_items := make(map[string]bool)
 
 	// split the tsx_content on white spaces
 	splited := strings.Split(tsx_content, " ")
@@ -53,6 +53,8 @@ func parseTransaction(tsx_content string) {
 		}
 		op := bytes[0]
 		data_item := bytes[2]
+		//
+		data_items[data_item] = true
 		return op, data_item
 	}
 
@@ -69,5 +71,10 @@ func parseTransaction(tsx_content string) {
 	}
 
 	tsx := Transaction{}
-	tsx.NewTransaction(operations)
+	// convert data_items to a list
+	data_items_list := []string{}
+	for data_item := range data_items {
+		data_items_list = append(data_items_list, data_item)
+	}
+	tsx.NewTransaction(operations, data_items_list)
 }

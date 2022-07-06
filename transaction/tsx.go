@@ -27,7 +27,6 @@ func (t *Transaction) NewTransaction(ops []Operation, dataItems []string) {
 	t.Operations = ops
 	t.DataItems = dataItems
 	Transactions = append(Transactions, *t)
-	// fmt.Println(t)
 }
 
 func (t *Transaction) SetTimestamp(ts int) {

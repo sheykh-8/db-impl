@@ -47,22 +47,18 @@ func (s *Schedule) BeginTransaction(tsx *transaction.Transaction) {
 	tsx.SetTimestamp(timestampCounter)
 
 	timestampCounter++
+
+	fmt.Println("Begin", tsx.Id)
 }
 
 func (s *Schedule) AddEntry(tsxId int, op *transaction.Operation) {
 	s.Items = append(s.Items, ScheduleItem{TsxId: tsxId, Status: InProgress, Op: op})
-	fmt.Println("addEntry", tsxId, *op)
-	// for _, t := range s.ActiveTransactions {
-	// 	fmt.Println("active", t.Id)
-	// }
+	fmt.Println("T", tsxId, *op)
 }
 
 func (s *Schedule) AbortTransaction(tsx *transaction.Transaction, lm *lock.LockManager) {
 	s.Items = append(s.Items, ScheduleItem{TsxId: tsx.Id, Status: Abort, Op: nil})
 	// release all the locks that were acquired by the transaction
-	// for _, t := range s.ActiveTransactions {
-	// 	if t.Id == tsxId {
-	fmt.Println("data items", tsx.Id, tsx.DataItems)
 	for _, dataItem := range tsx.DataItems {
 		if ok := lm.RemoveFromWaitList(tsx, dataItem); ok {
 			fmt.Println("remove ", tsx.Id, "from wait list", dataItem)
@@ -73,11 +69,11 @@ func (s *Schedule) AbortTransaction(tsx *transaction.Transaction, lm *lock.LockM
 			s.ActiveTransactions = append(s.ActiveTransactions, tsx)
 		}
 		// release the lock
-		released, remainingWaitList := lm.ReleaseLock(tsx.Id, dataItem)
+		_, remainingWaitList := lm.ReleaseLock(tsx.Id, dataItem)
 		// add the list to active transactions
 		s.ActiveTransactions = append(s.ActiveTransactions, remainingWaitList...)
 
-		fmt.Println("released lock", released, dataItem)
+		// fmt.Println("released lock", released, dataItem)
 
 	}
 	// remove the transaction from the active list
@@ -85,6 +81,7 @@ func (s *Schedule) AbortTransaction(tsx *transaction.Transaction, lm *lock.LockM
 	// break
 	// 	}
 	// }
+	fmt.Println("Abort", tsx.Id)
 }
 
 func (s *Schedule) CommitTransaction(tsx *transaction.Transaction, lm *lock.LockManager) {
@@ -95,14 +92,14 @@ func (s *Schedule) CommitTransaction(tsx *transaction.Transaction, lm *lock.Lock
 	for _, dataItem := range tsx.DataItems {
 		// check the waitlist for the lock and start a transaction from the start of th waitlist
 		if tsx, ok := lm.PickWaitList(dataItem); ok {
-			fmt.Println("start transaction", tsx.Id)
+			// fmt.Println("start transaction", tsx.Id)
 			s.ActiveTransactions = append(s.ActiveTransactions, tsx)
 		}
 		// release the lock
-		released, remainingWaitList := lm.ReleaseLock(tsx.Id, dataItem)
+		_, remainingWaitList := lm.ReleaseLock(tsx.Id, dataItem)
 		s.ActiveTransactions = append(s.ActiveTransactions, remainingWaitList...)
 
-		fmt.Println("released lock", released, dataItem)
+		// fmt.Println("released lock", released, dataItem)
 
 	}
 
@@ -148,9 +145,8 @@ func RunWithDetection() {
 	index := 0
 	for len(schedule.ActiveTransactions) > 0 {
 		// get the next operation to execute
-		// fmt.Println("index", index)
 		ts := schedule.ActiveTransactions[index]
-		// fmt.Println("id", ts.Id)
+
 		peekOp := ts.PeekNextOperation()
 		if peekOp == nil {
 			// transaction is finished
@@ -165,7 +161,7 @@ func RunWithDetection() {
 				schedule.AddEntry(ts.Id, op)
 			} else {
 				// couldn't get the lock
-				fmt.Println("couldn't get the lock")
+				// fmt.Println("couldn't get the lock")
 				// remove the transaction from the active list
 				schedule.ActiveTransactions = removeFromList(schedule.ActiveTransactions, ts.Id)
 				// add the transaction to wait list
@@ -184,17 +180,19 @@ func RunWithDetection() {
 					// remove the vertix from wait for graph
 					wf.RemoveVertix(ts.Id)
 
+					// re-submit the aborted transaction to the active transaction list as a new transaction
+					newTsx := transaction.Transaction{
+						Id:         ts.Id,
+						DataItems:  ts.DataItems,
+						Operations: ts.Operations,
+					}
+
+					schedule.BeginTransaction(&newTsx)
+					wf.AddVertex(newTsx.Id)
 				}
 
 			}
 		}
-
-		// print the active transction ids
-		activeIds := []int{}
-		for _, t := range schedule.ActiveTransactions {
-			activeIds = append(activeIds, t.Id)
-		}
-		fmt.Println("active transactions", activeIds)
 
 		if len(schedule.ActiveTransactions) == 0 {
 			break

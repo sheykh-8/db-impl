@@ -1,7 +1,5 @@
 package lock
 
-import "fmt"
-
 // wait for graph algorithm for deadlock detection
 
 type WaitForGraph struct {
@@ -29,7 +27,7 @@ func (w *WaitForGraph) AddEdge(tsxId int, waitTsxId int) {
 		}
 	}
 	w.graph[tsxId] = append(w.graph[tsxId], waitTsxId)
-	fmt.Println(w.graph)
+	// fmt.Println(w.graph)
 }
 
 func (w *WaitForGraph) IsDeadlock() bool {

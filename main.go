@@ -13,7 +13,7 @@ func main() {
 
 	pathPtr := flag.String("path", "", "path to the directory of the transactions")
 
-	preventionPtr := flag.Bool("prevent", false, "use the prevention algorithms to run the transactions")
+	flag.Bool("prevent", false, "use the prevention algorithms to run the transactions")
 
 	detectionPtr := flag.Bool("detection", false, "use the detection algorithms to run the transactions")
 
@@ -27,7 +27,7 @@ func main() {
 		return
 	}
 
-	// todo: parse the transactions from the directory
+	// TODO: parse the transactions from the directory
 	transaction.ParseTransactions(pathPtr)
 
 	if *detectionPtr {
@@ -40,9 +40,4 @@ func main() {
 		t.MakeItems()
 		t.Run()
 	}
-
-	// todo: use the flags to decide what to do with the parsed transactions
-	fmt.Println("prevention:", *preventionPtr)
-	fmt.Println("detection:", *detectionPtr)
-	fmt.Println("timestamp:", *timestampPtr)
 }

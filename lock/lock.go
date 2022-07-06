@@ -29,3 +29,13 @@ func (l *Lock) PickWaitList() (*transaction.Transaction, bool) {
 	}
 	return nil, false
 }
+
+func (l *Lock) RemoveWaitList(tsx *transaction.Transaction) bool {
+	for i, v := range l.WaitList {
+		if v.Id == tsx.Id {
+			l.WaitList = append(l.WaitList[:i], l.WaitList[i+1:]...)
+			return true
+		}
+	}
+	return false
+}

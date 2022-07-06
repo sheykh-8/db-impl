@@ -28,4 +28,21 @@ func TestWaitForGraph(t *testing.T) {
 	if wf.IsDeadlock() {
 		t.Error("this should not be a deadlock")
 	}
+
+	wf.AddEdge(2, 1)
+	wf.AddEdge(2, 1)
+
+	findCount := func(list []int, item int) int {
+		count := 0
+		for _, v := range list {
+			if v == item {
+				count++
+			}
+		}
+		return count
+	}
+
+	if findCount(wf.Graph()[2], 1) == 2 {
+		t.Error("this should have 1 edge to 1")
+	}
 }

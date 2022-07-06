@@ -64,14 +64,21 @@ func (s *Schedule) AbortTransaction(tsx *transaction.Transaction, lm *lock.LockM
 	// 	if t.Id == tsxId {
 	fmt.Println("data items", tsx.Id, tsx.DataItems)
 	for _, dataItem := range tsx.DataItems {
-		// release the lock
-		released := lm.ReleaseLock(tsx.Id, dataItem)
-		fmt.Println("released lock", released, dataItem)
+		if ok := lm.RemoveFromWaitList(tsx, dataItem); ok {
+			fmt.Println("remove ", tsx.Id, "from wait list", dataItem)
+		}
 		// check the waitlist for the lock and start a transaction from the start of th waitlist
 		if tsx, ok := lm.PickWaitList(dataItem); ok {
 			fmt.Println("start transaction", tsx.Id)
 			s.ActiveTransactions = append(s.ActiveTransactions, tsx)
 		}
+		// release the lock
+		released, remainingWaitList := lm.ReleaseLock(tsx.Id, dataItem)
+		// add the list to active transactions
+		s.ActiveTransactions = append(s.ActiveTransactions, remainingWaitList...)
+
+		fmt.Println("released lock", released, dataItem)
+
 	}
 	// remove the transaction from the active list
 	s.ActiveTransactions = removeFromList(s.ActiveTransactions, tsx.Id)
@@ -80,12 +87,26 @@ func (s *Schedule) AbortTransaction(tsx *transaction.Transaction, lm *lock.LockM
 	// }
 }
 
-func (s *Schedule) CommitTransaction(tsxId int) {
-	s.Items = append(s.Items, ScheduleItem{TsxId: tsxId, Status: Commit, Op: nil})
+func (s *Schedule) CommitTransaction(tsx *transaction.Transaction, lm *lock.LockManager) {
+	s.Items = append(s.Items, ScheduleItem{TsxId: tsx.Id, Status: Commit, Op: nil})
 	// remove item from active list
-	s.ActiveTransactions = removeFromList(s.ActiveTransactions, tsxId)
+	s.ActiveTransactions = removeFromList(s.ActiveTransactions, tsx.Id)
 
-	fmt.Println("commit", tsxId)
+	for _, dataItem := range tsx.DataItems {
+		// check the waitlist for the lock and start a transaction from the start of th waitlist
+		if tsx, ok := lm.PickWaitList(dataItem); ok {
+			fmt.Println("start transaction", tsx.Id)
+			s.ActiveTransactions = append(s.ActiveTransactions, tsx)
+		}
+		// release the lock
+		released, remainingWaitList := lm.ReleaseLock(tsx.Id, dataItem)
+		s.ActiveTransactions = append(s.ActiveTransactions, remainingWaitList...)
+
+		fmt.Println("released lock", released, dataItem)
+
+	}
+
+	fmt.Println("commit", tsx.Id)
 }
 
 func removeFromList(list []*transaction.Transaction, id int) []*transaction.Transaction {
@@ -133,7 +154,10 @@ func RunWithDetection() {
 		peekOp := ts.PeekNextOperation()
 		if peekOp == nil {
 			// transaction is finished
-			schedule.CommitTransaction(ts.Id)
+			schedule.CommitTransaction(ts, &lm)
+			// remove vertice from the wait for graph
+			wf.RemoveVertix(ts.Id)
+
 		} else {
 			if _, ok := lm.AquireLock(ts.Id, ts.PeekNextOperation().DataItem, ts.PeekNextOperation().Type); ok {
 				op := ts.ExecuteNextOperation()
@@ -164,6 +188,13 @@ func RunWithDetection() {
 
 			}
 		}
+
+		// print the active transction ids
+		activeIds := []int{}
+		for _, t := range schedule.ActiveTransactions {
+			activeIds = append(activeIds, t.Id)
+		}
+		fmt.Println("active transactions", activeIds)
 
 		if len(schedule.ActiveTransactions) == 0 {
 			break

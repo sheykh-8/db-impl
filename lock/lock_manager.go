@@ -4,8 +4,7 @@ import "sherfan.org/dbimpl/transaction"
 
 type LockManager struct {
 	// a hash map of the locks, key is the data_item and value is the Lock Object
-	Locks    map[string]*Lock
-	WaitList []transaction.Transaction
+	Locks map[string]*Lock
 }
 
 func (lm *LockManager) Init() {
@@ -53,7 +52,7 @@ func (lm *LockManager) AquireLock(tsxId int, dataItem string, lockType transacti
 	return make([]int, 0), false
 }
 
-func (lm *LockManager) ReleaseLock(tsxId int, dataItem string) (ok bool) {
+func (lm *LockManager) ReleaseLock(tsxId int, dataItem string) (ok bool, remainingWaitList []*transaction.Transaction) {
 	// check if the data item is locked
 	if lock, ok := lm.Locks[dataItem]; ok {
 		// check if the transaction id is in the list of the locks
@@ -64,12 +63,13 @@ func (lm *LockManager) ReleaseLock(tsxId int, dataItem string) (ok bool) {
 				// if the list of the locks is empty, delete the lock
 				if len(lock.TsxIds) == 0 {
 					delete(lm.Locks, dataItem)
+					return true, lock.WaitList
 				}
-				return true
+				return true, nil
 			}
 		}
 	}
-	return false
+	return false, nil
 }
 
 func (lm *LockManager) UpgradeLock(tsxId int, dataItem string) (ok bool) {
@@ -105,4 +105,15 @@ func (lm *LockManager) PickWaitList(dataItem string) (tsx *transaction.Transacti
 	}
 
 	return nil, false
+}
+
+func (lm *LockManager) RemoveFromWaitList(tsx *transaction.Transaction, dataItem string) (ok bool) {
+	// check if the data item is locked
+	if lock, ok := lm.Locks[dataItem]; ok {
+		// remove the transaction from the wait list
+		lock.RemoveWaitList(tsx)
+		return true
+	}
+
+	return false
 }

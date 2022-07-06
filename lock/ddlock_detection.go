@@ -22,6 +22,12 @@ func (w *WaitForGraph) AddVertex(tsxId int) {
 }
 
 func (w *WaitForGraph) AddEdge(tsxId int, waitTsxId int) {
+	// make sure the edge is not already in the graph
+	for _, v := range w.graph[tsxId] {
+		if v == waitTsxId {
+			return
+		}
+	}
 	w.graph[tsxId] = append(w.graph[tsxId], waitTsxId)
 	fmt.Println(w.graph)
 }

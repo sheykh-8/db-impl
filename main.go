@@ -22,6 +22,12 @@ func main() {
 
 	flag.Parse()
 
+	// path cannot be empty
+	if len(*pathPtr) == 0 {
+		fmt.Println("path is not specified")
+		return
+	}
+
 	// todo: parse the transactions from the directory
 	transaction.ParseTransactions(pathPtr)
 

@@ -42,15 +42,16 @@ func (t *TO) MakeItems() {
 
 // should be executed After 'MakeItems'
 func (t *TO) Run() {
+	if len(t.schedule.ActiveTransactions) == 0 {
+		fmt.Println("No transaction found.")
+		return
+	}
+
 	if len(t.items) == 0 {
 		fmt.Println("No item found.")
 		return
 	}
 
-	if len(t.schedule.ActiveTransactions) == 0 {
-		fmt.Println("No transaction found.")
-		return
-	}
 	// equals to the length of a transaction operations which has the
 	// most operations.
 	loopLength := 0

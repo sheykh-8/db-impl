@@ -39,10 +39,10 @@ func (s *Schedule) Init() {
 	s.Items = make([]ScheduleItem, 0)
 }
 
-func (s *Schedule) BeginTransaction(tsx transaction.Transaction) {
+func (s *Schedule) BeginTransaction(tsx *transaction.Transaction) {
 	s.Items = append(s.Items, ScheduleItem{TsxId: tsx.Id, Status: Beign, Op: nil})
 	// add transaction to the active list
-	s.ActiveTransactions = append(s.ActiveTransactions, &tsx)
+	s.ActiveTransactions = append(s.ActiveTransactions, tsx)
 	// set timestamp on the transaction
 	tsx.SetTimestamp(timestampCounter)
 
@@ -102,8 +102,9 @@ func RunWithDetection() {
 
 	// todo: iterate over the shuffled transactions and execute them one operation at a time until all transactions are finished
 	for _, tsx := range shuffledTransactions {
-		schedule.BeginTransaction(tsx)
-		op := tsx.ExecuteNextOperation()
+		ts := tsx
+		schedule.BeginTransaction(&ts)
+		op := ts.ExecuteNextOperation()
 		schedule.AddEntry(tsx.Id, op)
 	}
 

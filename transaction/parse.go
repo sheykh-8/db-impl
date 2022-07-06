@@ -69,5 +69,5 @@ func parseTransaction(tsx_content string) {
 	}
 
 	tsx := Transaction{}
-	tsx.new(operations)
+	tsx.NewTransaction(operations)
 }

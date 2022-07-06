@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"sherfan.org/dbimpl/schedule"
+	"sherfan.org/dbimpl/to"
 	"sherfan.org/dbimpl/transaction"
 )
 
@@ -33,6 +34,13 @@ func main() {
 
 	if *detectionPtr {
 		schedule.RunWithDetection()
+	}
+
+	if *timestampPtr {
+		s := schedule.New(transaction.Transactions)
+		t := to.New(s)
+		t.MakeItems()
+		t.Run()
 	}
 
 	// todo: use the flags to decide what to do with the parsed transactions

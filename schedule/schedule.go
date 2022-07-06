@@ -35,6 +35,26 @@ type Schedule struct {
 	ActiveTransactions []*transaction.Transaction
 }
 
+func New(transactions []transaction.Transaction) Schedule {
+	shuffledTransactions := transaction.Transactions[:]
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(shuffledTransactions), func(i, j int) {
+		shuffledTransactions[i], shuffledTransactions[j] = shuffledTransactions[j], shuffledTransactions[i]
+	})
+
+	// Schedule wants pointer based array.
+	var activeTss []*transaction.Transaction
+	for i, t := range shuffledTransactions {
+		t.SetTimestamp(i)
+		new_t := t
+		activeTss = append(activeTss, &new_t)
+	}
+
+	return Schedule{
+		ActiveTransactions: activeTss,
+	}
+}
+
 func (s *Schedule) Init() {
 	s.Items = make([]ScheduleItem, 0)
 }
